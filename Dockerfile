@@ -12,6 +12,9 @@ WORKDIR /app
 
 ENV RUSTFLAGS="-C target-feature=+aes,+sse2"
 
+# Mark /app as a safe git directory to avoid "dubious ownership" errors
+RUN git config --global --add safe.directory /app
+
 # Make the script executable
 RUN chmod +x script.sh
 

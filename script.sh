@@ -21,7 +21,7 @@ cargo build --release
 cd -
 
 # Now build MORK (server branch)
-MORK_REPO="https://github.com/trueagi-io/MORK.git"
+MORK_REPO="https://github.com/DeazStar/MORK.git"
 MORK_DIR="/app/MORK"
 
 git checkout -f server
