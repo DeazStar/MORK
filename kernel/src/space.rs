@@ -1194,6 +1194,108 @@ impl DefaultSpace {
     }
 }
 
+impl DefaultSpace {
+    pub fn load_authors_from_json(&mut self, authors: &[Author]) -> Result<(usize, usize), String> {
+        let mut writer = self.new_writer(&[], &())?;
+        let mut mz = self.write_zipper(&mut writer);
+        load_authors_from_json_impl(&self.sm, &mut mz, authors)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Author {
+    pub id: String,
+    pub name: String,
+    pub nationality: String,
+    pub birth: String,
+    pub death: String,
+    pub works: Vec<Work>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Work {
+    pub title: String,
+    pub published: i32,
+}
+
+pub(crate) fn load_authors_from_json_impl<'s, WZ>(
+    sm: &SharedMappingHandle,
+    wz: &mut WZ,
+    authors: &[Author],
+) -> Result<(usize, usize), String>
+where
+    WZ:Zipper + ZipperMoving + ZipperWriting<()>,
+{
+    let mut pdp = ParDataParser::new(sm);
+
+    let mut author_count = 0;
+    let mut work_count = 0;
+
+    for a in authors {
+        let id_tok = pdp.tokenizer(a.id.as_bytes());
+        let name_tok = pdp.tokenizer(a.name.as_bytes());
+        let nat_tok = pdp.tokenizer(a.nationality.as_bytes());
+        let birth_tok = pdp.tokenizer(a.birth.as_bytes());
+        let death_tok = pdp.tokenizer(a.death.as_bytes());
+
+        wz.descend_to(id_tok);
+        wz.set_val(());
+        wz.reset();
+
+        author_count += 1;
+
+        for w in &a.works {
+            let title_tok = pdp.tokenizer(w.title.as_bytes());
+            let published_tok = pdp.tokenizer(&w.published.to_be_bytes());
+
+            wz.descend_to(title_tok);
+            wz.set_val(());
+            wz.reset();
+
+            work_count += 1;
+        }
+    }
+
+    Ok((author_count, work_count))
+}
+
+#[test]
+
+fn test_load_authors_from_json() {
+    let mut s = DefaultSpace::new();
+    let authors = vec![
+        Author {
+            id: "author_001".to_string(),
+            name: "Leo Tolstoy".to_string(),
+            nationality: "Russian".to_string(),
+            birth: "1828-09-09".to_string(),
+            death: "1910-11-20".to_string(),
+            works: vec![
+                Work { title: "War and Peace".to_string(), published: 1869 },
+                Work { title: "Anna Karenina".to_string(), published: 1877 },
+            ],
+        },
+        Author {
+            id: "author_002".to_string(),
+            name: "Fyodor Dostoevsky".to_string(),
+            birth: "1821-11-11".to_string(),
+            death: "1881-02-09".to_string(),
+            works: vec![
+                Work { title: "Crime and Punishment".to_string(), published: 1866 },
+            ],
+        }
+    ];
+
+    let (a_count, w_count) = s.load_authors_from_json(&authors).unwrap();
+    assert_eq!(a_count, 2);
+    assert_eq!(w_count, 3);
+
+    let mut writer = Vec::new();
+    s.dump_sexpr(expr!(s, "$"), expr!(s, "_1"), &mut writer).unwrap();
+    let out = String::from_utf8(writer).unwrap();
+    println!("Results:\n{}", out);
+}
+
 #[cfg(feature="neo4j")]
 pub(crate) fn load_neo4j_triples_impl<'s, WZ>(sm : &SharedMappingHandle, wz : &mut WZ, rt : &tokio::runtime::Handle, uri: &str, user: &str, pass: &str) -> Result<PathCount, String> 
     where
